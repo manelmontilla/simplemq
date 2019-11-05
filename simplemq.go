@@ -16,19 +16,6 @@ type Message struct {
 	Payload  string    `json:"payload"`
 }
 
-type op struct {
-	queueID string
-}
-
-type readOp struct {
-	op
-	resp chan Message
-}
-type writeOp struct {
-	op
-	m Message
-}
-
 // SimpleMQ is a very simple queue designed to be used by systems that don't
 // high performance queue and/or in memory queues.
 type SimpleMQ struct {
