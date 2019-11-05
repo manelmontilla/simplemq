@@ -58,8 +58,7 @@ func (s *SimpleMQ) Dequeue() Message {
 }
 
 func (s *SimpleMQ) handlePOSTMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-
-	id := ps.ByName("queue_id")
+	id := ps.ByName("external_id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("error queue_id is mandatory"))
@@ -90,13 +89,6 @@ func (s *SimpleMQ) handlePOSTMessage(w http.ResponseWriter, r *http.Request, ps 
 }
 
 func (s *SimpleMQ) handleGETMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	id := ps.ByName("queue_id")
-	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("error queue_id is mandatory"))
-		return
-	}
-
 	m := s.Dequeue()
 	if m.Payload == "" {
 		w.WriteHeader(http.StatusNotFound)
@@ -114,8 +106,8 @@ func (s *SimpleMQ) handleGETMessage(w http.ResponseWriter, r *http.Request, ps h
 // ListenAndServe starts de queue, it blocks the calling goroutine.
 func (s *SimpleMQ) ListenAndServe() error {
 	r := httprouter.New()
-	r.POST("/messages/:queue_id", s.handlePOSTMessage)
-	r.GET("/messages/:queue_id", s.handleGETMessage)
+	r.POST("/messages/:external_id", s.handlePOSTMessage)
+	r.GET("/messages/:external_id", s.handleGETMessage)
 	server := &http.Server{Addr: s.Addr, Handler: r}
 	s.Srv = server
 	return server.ListenAndServe()
