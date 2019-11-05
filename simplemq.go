@@ -53,7 +53,13 @@ func (s *SimpleMQ) Dequeue(queueID string) Message {
 		return Message{}
 	}
 	m := msgs[0]
-	s.Queues[queueID] = msgs[1:len(msgs)]
+	msgs = msgs[1:len(msgs)]
+	if len(msgs) < 1 {
+		delete(s.Queues, queueID)
+
+	} else {
+		s.Queues[queueID] = msgs
+	}
 	return m
 }
 
