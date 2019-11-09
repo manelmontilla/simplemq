@@ -17,8 +17,7 @@ type Message struct {
 	Payload    string    `json:"payload"`
 }
 
-// SimpleMQ is a very simple queue designed to be used by systems that don't
-// high performance queue and/or in memory queues.
+// SimpleMQ is a very simple queue.
 type SimpleMQ struct {
 	Addr           string
 	Queue          []Message
