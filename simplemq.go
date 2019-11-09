@@ -12,15 +12,15 @@ import (
 )
 
 type Message struct {
-	Received time.Time `json:"Received"`
-	Payload  string    `json:"payload"`
+	ExternalID string    `json:"external_id"`
+	Received   time.Time `json:"Received"`
+	Payload    string    `json:"payload"`
 }
 
-// SimpleMQ is a very simple queue designed to be used by systems that don't
-// high performance queue and/or in memory queues.
+// SimpleMQ is a very simple queue.
 type SimpleMQ struct {
 	Addr           string
-	Queues         map[string][]Message
+	Queue          []Message
 	Srv            *http.Server
 	serverFinished chan error
 	sync.Mutex
@@ -30,36 +30,34 @@ type SimpleMQ struct {
 func New(addr string) *SimpleMQ {
 	return &SimpleMQ{
 		Addr:           addr,
-		Queues:         make(map[string][]Message),
+		Queue:          make([]Message, 0, 100),
 		serverFinished: make(chan error, 1),
 	}
 }
 
 // Enqueue enqueue a message to a queue.
-func (s *SimpleMQ) Enqueue(queueID string, m Message) {
+func (s *SimpleMQ) Enqueue(m Message) {
 	s.Lock()
 	defer s.Unlock()
-	msgs := s.Queues[queueID]
-	msgs = append(msgs, m)
-	s.Queues[queueID] = msgs
+	s.Queue = append(s.Queue, m)
 }
 
 // Dequeue dequeue an element from the given queue.
-func (s *SimpleMQ) Dequeue(queueID string) Message {
+func (s *SimpleMQ) Dequeue() Message {
 	s.Lock()
 	defer s.Unlock()
-	msgs := s.Queues[queueID]
+	msgs := s.Queue
 	if len(msgs) < 1 {
 		return Message{}
 	}
 	m := msgs[0]
-	s.Queues[queueID] = msgs[1:len(msgs)]
+	msgs = msgs[1:len(msgs)]
+	s.Queue = msgs
 	return m
 }
 
 func (s *SimpleMQ) handlePOSTMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-
-	id := ps.ByName("queue_id")
+	id := ps.ByName("external_id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("error queue_id is mandatory"))
@@ -81,22 +79,16 @@ func (s *SimpleMQ) handlePOSTMessage(w http.ResponseWriter, r *http.Request, ps 
 
 	// We block the request here to backpresure the consumer if needed.
 	m := Message{
-		Payload:  string(payload),
-		Received: time.Now(),
+		ExternalID: id,
+		Payload:    string(payload),
+		Received:   time.Now(),
 	}
-	s.Enqueue(id, m)
+	s.Enqueue(m)
 	w.WriteHeader(http.StatusCreated)
 }
 
 func (s *SimpleMQ) handleGETMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	id := ps.ByName("queue_id")
-	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("error queue_id is mandatory"))
-		return
-	}
-
-	m := s.Dequeue(id)
+	m := s.Dequeue()
 	if m.Payload == "" {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -113,8 +105,8 @@ func (s *SimpleMQ) handleGETMessage(w http.ResponseWriter, r *http.Request, ps h
 // ListenAndServe starts de queue, it blocks the calling goroutine.
 func (s *SimpleMQ) ListenAndServe() error {
 	r := httprouter.New()
-	r.POST("/messages/:queue_id", s.handlePOSTMessage)
-	r.GET("/messages/:queue_id", s.handleGETMessage)
+	r.POST("/messages/:external_id", s.handlePOSTMessage)
+	r.GET("/messages/:external_id", s.handleGETMessage)
 	server := &http.Server{Addr: s.Addr, Handler: r}
 	s.Srv = server
 	return server.ListenAndServe()
