@@ -3,6 +3,7 @@ package simplemq
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"sync"
@@ -20,6 +21,7 @@ type Message struct {
 // SimpleMQ is a very simple queue.
 type SimpleMQ struct {
 	Addr           string
+	Path           string
 	Queue          []Message
 	Srv            *http.Server
 	serverFinished chan error
@@ -27,7 +29,7 @@ type SimpleMQ struct {
 }
 
 // New creates a new simple queue service that will listen to the given address.
-func New(addr string) *SimpleMQ {
+func New(addr, path string) *SimpleMQ {
 	return &SimpleMQ{
 		Addr:           addr,
 		Queue:          make([]Message, 0, 100),
@@ -51,7 +53,7 @@ func (s *SimpleMQ) Dequeue() Message {
 		return Message{}
 	}
 	m := msgs[0]
-	msgs = msgs[1:len(msgs)]
+	msgs = msgs[1:]
 	s.Queue = msgs
 	return m
 }
@@ -105,8 +107,13 @@ func (s *SimpleMQ) handleGETMessage(w http.ResponseWriter, r *http.Request, ps h
 // ListenAndServe starts de queue, it blocks the calling goroutine.
 func (s *SimpleMQ) ListenAndServe() error {
 	r := httprouter.New()
-	r.POST("/messages/:external_id", s.handlePOSTMessage)
-	r.GET("/messages/:external_id", s.handleGETMessage)
+	path := s.Path
+	if path != "" {
+		path = "/" + path
+	}
+	route := fmt.Sprintf("%s/:external_id", path)
+	r.POST(route, s.handlePOSTMessage)
+	r.GET(route, s.handleGETMessage)
 	server := &http.Server{Addr: s.Addr, Handler: r}
 	s.Srv = server
 	return server.ListenAndServe()

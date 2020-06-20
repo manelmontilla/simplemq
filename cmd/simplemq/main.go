@@ -12,16 +12,18 @@ import (
 
 var (
 	addr string
+	path string
 )
 
 func main() {
-	flag.StringVar(&addr, "addr", "", "addr to listen on, for instace 127.0.0.1:8080")
+	flag.StringVar(&addr, "addr", "", "addr to listen on, for instace: 127.0.0.1:8080")
+	flag.StringVar(&path, "path", "", "path to listen on, for instance: messages")
 	flag.Parse()
 	if addr == "" {
 		fmt.Fprint(os.Stderr, "addr param is required")
 		os.Exit(1)
 	}
-	mq := simplemq.New(addr)
+	mq := simplemq.New(addr, path)
 	done := make(chan error)
 
 	go func() {
@@ -44,7 +46,7 @@ func main() {
 	}
 	err = mq.Stop()
 	if err != nil {
-		fmt.Fprint(os.Stderr, "error closing the queue %+v", err)
+		fmt.Fprintf(os.Stderr, "error closing the queue %+v", err)
 		os.Exit(1)
 	}
 }
