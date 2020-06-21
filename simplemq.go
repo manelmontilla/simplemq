@@ -31,6 +31,7 @@ type SimpleMQ struct {
 // New creates a new simple queue service that will listen to the given address.
 func New(addr, path string) *SimpleMQ {
 	return &SimpleMQ{
+		Path:           path,
 		Addr:           addr,
 		Queue:          make([]Message, 0, 100),
 		serverFinished: make(chan error, 1),
@@ -104,6 +105,11 @@ func (s *SimpleMQ) handleGETMessage(w http.ResponseWriter, r *http.Request, ps h
 	}
 }
 
+func (s *SimpleMQ) handleNotFoundRoute(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("request received: %+v\n", r.URL)
+	w.WriteHeader(http.StatusForbidden)
+}
+
 // ListenAndServe starts de queue, it blocks the calling goroutine.
 func (s *SimpleMQ) ListenAndServe() error {
 	r := httprouter.New()
@@ -111,8 +117,9 @@ func (s *SimpleMQ) ListenAndServe() error {
 	if path != "" {
 		path = "/" + path
 	}
+	r.NotFound = http.HandlerFunc(s.handleNotFoundRoute)
 	route := fmt.Sprintf("%s/:external_id", path)
-	r.POST(route, s.handlePOSTMessage)
+	r.PATCH(route, s.handlePOSTMessage)
 	r.GET(route, s.handleGETMessage)
 	server := &http.Server{Addr: s.Addr, Handler: r}
 	s.Srv = server
